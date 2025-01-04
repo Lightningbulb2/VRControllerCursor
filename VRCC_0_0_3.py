@@ -45,8 +45,7 @@ class OBJECT_OT_GrabObject(Operator):
         #  that might be poor user interaction if I use the simple "context.object"
         if context.selected_objects and (context.selected_objects)[0]:
             
-
-            print(mathutils.Euler.to_quaternion(mathutils.Euler((bpy.types.calibrationx, bpy.types.calibrationy, bpy.types.calibrationz), "XYZ")))
+           
 
             self.firstx = (context.selected_objects)[0].rotation_euler.x
             self.firsty = (context.selected_objects)[0].rotation_euler.y
@@ -55,22 +54,24 @@ class OBJECT_OT_GrabObject(Operator):
             area = next(area for area in bpy.context.screen.areas if area.type == 'VIEW_3D')
             area.spaces[0].region_3d.view_rotation
 
-            cameraPerspectiveDelta = mathutils.Quaternion(area.spaces[0].region_3d.view_rotation)
+            viewportCameraOrientation = mathutils.Quaternion(area.spaces[0].region_3d.view_rotation)
 
-            calibrationQuaternion = mathutils.Euler.to_quaternion(mathutils.Euler((bpy.types.calibrationx, bpy.types.calibrationy, bpy.types.calibrationz), "XYZ"))
-
+            calibrationOrientation = mathutils.Euler.to_quaternion(mathutils.Euler((bpy.types.calibrationx, bpy.types.calibrationy, bpy.types.calibrationz), "XYZ"))
             
-
 
             controllerOrientation = mathutils.Quaternion(bpy.types.XrSessionState.controller_grip_rotation_get(bpy.context,0))
 
-            #controllerOrientation.rotate(calibrationQuaternion.inverted())
-            print("camera:" + str(cameraPerspectiveDelta))
+           
 
+            print("calibration on invoke:" + str(calibrationOrientation))
 
+            
 
-            controllerOrientation.rotate(cameraPerspectiveDelta)
+            controllerOrientation.rotate(calibrationOrientation.inverted())
 
+            controllerOrientation.rotate(viewportCameraOrientation)
+
+            
 
             self.controllerfirstx = mathutils.Quaternion.to_euler(controllerOrientation).x
             self.controllerfirsty = mathutils.Quaternion.to_euler(controllerOrientation).y
@@ -87,7 +88,11 @@ class OBJECT_OT_GrabObject(Operator):
 
 
     def modal(self, context, event):
+
+
         
+        
+        calibrationOrientation = mathutils.Euler.to_quaternion(mathutils.Euler((bpy.types.calibrationx, bpy.types.calibrationy, bpy.types.calibrationz), "XYZ"))
         
         # rotation the object started at
         objectstartingpos = mathutils.Euler.to_quaternion(mathutils.Euler((self.firstx, self.firsty, self.firstz),"XYZ"))
@@ -95,31 +100,24 @@ class OBJECT_OT_GrabObject(Operator):
 
 
         # START controller's original rotation on button press
-        controllerStart = mathutils.Euler.to_quaternion(mathutils.Euler((self.controllerfirstx, self.controllerfirsty, self.controllerfirstz),"XYZ"))
+        controllerStartOrientation = mathutils.Euler.to_quaternion(mathutils.Euler((self.controllerfirstx, self.controllerfirsty, self.controllerfirstz),"XYZ"))
         # current controller rotation
-        controllerquaternion = mathutils.Quaternion(bpy.types.XrSessionState.controller_grip_rotation_get(bpy.context,0))
+        currentControllerOrientation = mathutils.Quaternion(bpy.types.XrSessionState.controller_grip_rotation_get(bpy.context,0))
 
 
 
         
-        calibrationQuaternion = mathutils.Euler.to_quaternion(mathutils.Euler((bpy.types.calibrationx, bpy.types.calibrationy, bpy.types.calibrationz), "XYZ"))
- 
-        
-
-        #controllerStart.rotate(calibrationQuaternion)
+    
 
 
 
         
         # start at controller starting location
-        controllerDelta = controllerStart.inverted()
+        controllerDelta = controllerStartOrientation.inverted()
 
-        #controllerDelta.rotate(calibrationQuaternion.inverted())
-
-        #controllerquaternion.rotate(calibrationQuaternion)
 
         # rotate vector to current controller position
-        controllerDelta.rotate(controllerquaternion)
+        controllerDelta.rotate(currentControllerOrientation)
 
         
 
@@ -129,10 +127,17 @@ class OBJECT_OT_GrabObject(Operator):
         viewportCameraOrientation = mathutils.Quaternion(area.spaces[0].region_3d.view_rotation)
 
 
+   
+        controllerDelta.rotate(calibrationOrientation.inverted())
+
         # correct for differing camera rotation
         controllerDelta.rotate(viewportCameraOrientation)
 
-        print("controller delta:" + str(controllerDelta) + "(should be 1,0,0,0 on grab)")
+
+
+        #print(mathutils.Quaternion.to_euler(currentControllerOrientation))
+
+        #print("controller delta:" + str(controllerDelta) + "(should be 1,0,0,0 on grab)")
 
         newObjectRotation = objectstartingpos
         newObjectRotation.rotate(controllerDelta)
@@ -207,6 +212,8 @@ class VRCC_PT_SettingsPanel(Panel):
 
         # Draw a property for the persistent variable
         layout.operator(VRCC_OT_SetCalibrationPoint.bl_idname, text = VRCC_OT_SetCalibrationPoint.bl_label)
+
+        layout.operator(OBJECT_OT_GrabObject.bl_idname, text="grab selected object")
         
 
     
@@ -239,7 +246,7 @@ def update_function(self, context):
     return
 
 def update_CalibrationPointX(self, context):
-    bpy.types.calibrationx = mathutils.Quaternion.to_euler(mathutils.Quaternion(bpy.types.XrSessionState.controller_grip_rotation_get(context,0))).x
+    bpy.types.calibrationx = mathutils.Quaternion.to_euler(mathutils.Quaternion(bpy.types.XrSessionState.controller_grip_rotation_get(context,0))).x - (math.pi/2)
     return 
 
 def update_CalibrationPointY(self, context):
