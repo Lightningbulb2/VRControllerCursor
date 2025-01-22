@@ -51,6 +51,9 @@ class OBJECT_OT_GrabObject(Operator):
             self.firstRotationy = (context.selected_objects)[0].rotation_euler.y
             self.firstRotationz = (context.selected_objects)[0].rotation_euler.z
 
+            self.compoundRotationOffsetx = 0
+            self.compoundRotationOffsety = 0
+            self.compoundRotationOffsetz = 0
 
             area = next(area for area in bpy.context.screen.areas if area.type == 'VIEW_3D')
             area.spaces[0].region_3d.view_rotation
@@ -67,9 +70,7 @@ class OBJECT_OT_GrabObject(Operator):
             self.lastModalRotationy = mathutils.Quaternion.to_euler(controllerOrientation).y
             self.lastModalRotationz = mathutils.Quaternion.to_euler(controllerOrientation).z
 
-            self.compoundRotationOffsetx = mathutils.Quaternion.to_euler(controllerOrientation).x
-            self.compoundRotationOffsety = mathutils.Quaternion.to_euler(controllerOrientation).y
-            self.compoundRotationOffsetz = mathutils.Quaternion.to_euler(controllerOrientation).z
+   
 
             print("calibration on invoke:" + str(calibrationOrientation))
 
@@ -125,6 +126,12 @@ class OBJECT_OT_GrabObject(Operator):
         controllerDelta = controllerStartOrientation.inverted()
 
 
+
+
+
+        # rotate vector to current controller position
+        controllerDelta.rotate(currentControllerOrientation)
+
         deltaSinceTriggerEvent = lastUpdateOrientation.inverted()
         deltaSinceTriggerEvent.rotate(currentControllerOrientation)
 
@@ -132,17 +139,23 @@ class OBJECT_OT_GrabObject(Operator):
 
         triggerPressure = context.window_manager.xr_session_state.action_state_get(context, "blender_default","teleport", "/user/hand/left")[0]
 
+        #triggerPressure = 0.2
+
+
         triggerOffset = mathutils.Euler.to_quaternion(mathutils.Euler((self.compoundRotationOffsetx, self.compoundRotationOffsety, self.compoundRotationOffsetz), "XYZ"))
+      #  print("cumulative Delta: " + str(triggerOffset))
 
-        identityquat = mathutils.Quaternion((1,0,0,0))
+        # TODO change update method to change ONLY instead of reverse offsetting it in this weird way
+        triggerAdjustedDelta = deltaSinceTriggerEvent.inverted().slerp(deltaSinceTriggerEvent,triggerPressure/2)
 
+       # print("slerped: " + str(triggerAdjustedDelta))
 
-        #rotate the compounded delta by this cycle's delta using the trigger as an interpolation facture (0 is no change, 1 is rotate by full delta this cycle)
-        triggerAdjustedDelta = identityquat.slerp(deltaSinceTriggerEvent,triggerPressure)
         triggerOffset.rotate(triggerAdjustedDelta)
-
         
         controllerDelta.rotate(triggerOffset)
+      #  print("update delta: " + str(deltaSinceTriggerEvent))
+     
+        #TODO FIX messed up perspective correction when trigger is < 1 for longer periods of time (causing the offset to do funky stuff)
         
         
 
@@ -159,6 +172,8 @@ class OBJECT_OT_GrabObject(Operator):
 
         # correct for differing camera rotation
         controllerDelta.rotate(viewportCameraOrientation)
+
+        
 
         newObjectRotation = objectstartingpos
         newObjectRotation.rotate(controllerDelta)
