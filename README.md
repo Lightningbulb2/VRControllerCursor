@@ -9,14 +9,22 @@ Project started 2024/12/30
 2025/1/4
 calibration corrected rotation implemented
 
+2025/1/20
+variable influence for rotation with trigger implemented
+
+2025/1/26
+rebuilt rotation system to use bpy.ops.transform.rotate() instead of manually setting rotation myself. (This adds full rotation compatibility to all different interaction types)
+
 
 ### TODO
+
+• fix horrendous lag caused by the transform.rotate() in a modal()
+
+• make the controller listener run more reliably
 
 • add user bindable keybinds
 
 • add location transformations
-
-• add variable influence for rotation with the trigger
 
 • add proper Euler mode that preserves rotation changes, not just orientation
 
